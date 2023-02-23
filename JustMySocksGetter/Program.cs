@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Collections;
+using System.Text;
 using System.Text.Json;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
@@ -7,7 +8,7 @@ namespace JustMySocksGetter
 {
     public class Program
     {
-        public class V2RayServer
+        private class V2RayServer
         {
             public string ps { get; set; } = null!;
             public string port { get; set; } = null!;
@@ -19,7 +20,7 @@ namespace JustMySocksGetter
             public string add { get; set; } = null!;
         }
 
-        public class YamlServer
+        private class YamlServer
         {
             [YamlMember(Alias = "name", ApplyNamingConventions = false)]
             public string Name { get; set; } = "Name";
@@ -52,6 +53,24 @@ namespace JustMySocksGetter
             public bool Udp { get; set; }
         }
 
+        private class ProxyGroup
+        {
+            [YamlMember(Alias = "name", ApplyNamingConventions = false)]
+            public string Name { get; set; } = "GroupName";
+
+            [YamlMember(Alias = "type", ApplyNamingConventions = false)]
+            public string Type { get; set; } = "select";
+
+            [YamlMember(Alias = "url", ApplyNamingConventions = false)]
+            public string Url { get; set; }
+
+            [YamlMember(Alias = "interval", ApplyNamingConventions = false)]
+            public int Interval { get; set; }
+
+            [YamlMember(Alias = "proxies", ApplyNamingConventions = false)]
+            public List<string> Proxies { get; set; }
+        }
+
         private class YamlConfig
         {
             [YamlMember(Alias = "port", ApplyNamingConventions = false)]
@@ -73,7 +92,10 @@ namespace JustMySocksGetter
             public string ExternalController { get; set; } = ":9090";
 
             [YamlMember(Alias = "proxies", ApplyNamingConventions = false)]
-            public List<YamlServer> Proxies { get; set; }
+            public List<YamlServer> Proxies { get; set; } = new List<YamlServer>();
+
+            [YamlMember(Alias = "proxy-groups", ApplyNamingConventions = false)]
+            public List<ProxyGroup> ProxyGroups { get; set; } = new List<ProxyGroup>();
         }
 
         public static async Task Main()
@@ -125,10 +147,10 @@ namespace JustMySocksGetter
             }
 
             // 反序列化
-            V2RayServer? Server1 = JsonSerializer.Deserialize<V2RayServer>(serverList[0]);
-            V2RayServer? Server2 = JsonSerializer.Deserialize<V2RayServer>(serverList[1]);
-            V2RayServer? Server3 = JsonSerializer.Deserialize<V2RayServer>(serverList[2]);
-            V2RayServer? Server4 = JsonSerializer.Deserialize<V2RayServer>(serverList[3]);
+            V2RayServer? server1 = JsonSerializer.Deserialize<V2RayServer>(serverList[0]);
+            V2RayServer? server2 = JsonSerializer.Deserialize<V2RayServer>(serverList[1]);
+            V2RayServer? server3 = JsonSerializer.Deserialize<V2RayServer>(serverList[2]);
+            V2RayServer? server4 = JsonSerializer.Deserialize<V2RayServer>(serverList[3]);
 
             static void PrintServerInfo(V2RayServer serverIn)
             {
@@ -144,41 +166,25 @@ namespace JustMySocksGetter
             }
 
             // 显示服务器信息
-            PrintServerInfo(Server1);
-            PrintServerInfo(Server2);
-            PrintServerInfo(Server3);
-            PrintServerInfo(Server4);
+            PrintServerInfo(server1);
+            PrintServerInfo(server2);
+            PrintServerInfo(server3);
+            PrintServerInfo(server4);
 
             // Test
             // 反序列化
-            var input = new StreamReader("./Sample.yml");
+            var input = new StreamReader("../../../../Sample.yml");
             var deserializer = new Deserializer();
             var yamlConfig = deserializer.Deserialize<YamlConfig>(input);
+            
+            // 序列化
+            var serializer = new Serializer();
+            await using (StreamWriter writer = new StreamWriter("../../../../Output.yml"))
+            {
+                await writer.WriteLineAsync(serializer.Serialize(yamlConfig));
+            }
 
-            yamlConfig.Port = 1313;
-
-            Console.WriteLine(yamlConfig.Port);
-            Console.WriteLine(yamlConfig.SocksPort);
-            Console.WriteLine(yamlConfig.AllowLan);
-            Console.WriteLine(yamlConfig.Mode);
-            Console.WriteLine(yamlConfig.LogLevel);
-            Console.WriteLine(yamlConfig.ExternalController);
-            Console.WriteLine(yamlConfig.Proxies[0].Name);
-
-            Console.ReadKey();
+            // Console.ReadKey();
         }
-
-        // Sample.yml
-        //     port: 7890
-        //     socks-port: 7891
-        //     allow-lan: true
-        //     mode: Rule
-        //         log-level: info
-        //         external-controller: :9090
-        //     proxies:
-        //     - {name: Name1, server: Server1, port: 80, type: vmess, uuid: UUID, alterId: 0, cipher: auto, tls: false, skip-cert-verify: true, udp: true}
-        // - {name: Name2, server: Server2, port: 80, type: vmess, uuid: UUID, alterId: 0, cipher: auto, tls: false, skip-cert-verify: true, udp: true}
-        // - {name: Name3, server: Server3, port: 80, type: vmess, uuid: UUID, alterId: 0, cipher: auto, tls: false, skip-cert-verify: true, udp: true}
-        // - {name: Name4, server: Server4, port: 80, type: vmess, uuid: UUID, alterId: 0, cipher: auto, tls: false, skip-cert-verify: true, udp: true}
     }
 }
