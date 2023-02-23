@@ -1,4 +1,5 @@
 ﻿using System.Collections;
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using System.Text.Json;
 using YamlDotNet.Serialization;
@@ -6,6 +7,8 @@ using YamlDotNet.Serialization.NamingConventions;
 
 namespace JustMySocksGetter
 {
+    [SuppressMessage("ReSharper", "ClassNeverInstantiated.Local")]
+    [SuppressMessage("ReSharper", "ClassNeverInstantiated.Global")]
     public class Program
     {
         private class V2RayServer
@@ -61,14 +64,14 @@ namespace JustMySocksGetter
             [YamlMember(Alias = "type", ApplyNamingConventions = false)]
             public string Type { get; set; } = "select";
 
-            [YamlMember(Alias = "url", ApplyNamingConventions = false)]
+            [YamlMember(Alias = "url", ApplyNamingConventions = false, DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
             public string Url { get; set; }
 
-            [YamlMember(Alias = "interval", ApplyNamingConventions = false)]
+            [YamlMember(Alias = "interval", ApplyNamingConventions = false, DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
             public int Interval { get; set; }
 
             [YamlMember(Alias = "proxies", ApplyNamingConventions = false)]
-            public List<string> Proxies { get; set; }
+            public List<string> Proxies { get; set; } = new List<string>();
         }
 
         private class YamlConfig
@@ -96,6 +99,9 @@ namespace JustMySocksGetter
 
             [YamlMember(Alias = "proxy-groups", ApplyNamingConventions = false)]
             public List<ProxyGroup> ProxyGroups { get; set; } = new List<ProxyGroup>();
+
+            [YamlMember(Alias = "rules", ApplyNamingConventions = false)]
+            public List<string> Rules { get; set; } = new List<string>();
         }
 
         public static async Task Main()
@@ -104,7 +110,7 @@ namespace JustMySocksGetter
 
             // http请求
             using var client = new HttpClient();
-            client.DefaultRequestHeaders.Add("User-Agent", "C# console program");
+            client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36");
             var serverContent = await client.GetStringAsync("https://jmssub.net/members/getsub.php?service=448481&id=54d7e392-0c83-4989-8586-35471ecb7bf8&noss=1");
 
             // base64解码函数
@@ -147,14 +153,11 @@ namespace JustMySocksGetter
             }
 
             // 反序列化
-            V2RayServer? server1 = JsonSerializer.Deserialize<V2RayServer>(serverList[0]);
-            V2RayServer? server2 = JsonSerializer.Deserialize<V2RayServer>(serverList[1]);
-            V2RayServer? server3 = JsonSerializer.Deserialize<V2RayServer>(serverList[2]);
-            V2RayServer? server4 = JsonSerializer.Deserialize<V2RayServer>(serverList[3]);
+            List<V2RayServer> v2RayServers = serverList.Select(t => JsonSerializer.Deserialize<V2RayServer>(t)).ToList();
 
             static void PrintServerInfo(V2RayServer serverIn)
             {
-                Console.WriteLine("----------------------");
+                Console.WriteLine("---------Start---------");
                 Console.WriteLine($"名称：{serverIn.ps}");
                 Console.WriteLine($"端口：{serverIn.port}");
                 Console.WriteLine($"用户ID：{serverIn.id}");
@@ -163,26 +166,37 @@ namespace JustMySocksGetter
                 Console.WriteLine($"伪装类型：{serverIn.type}");
                 Console.WriteLine($"TLS：{serverIn.tls}");
                 Console.WriteLine($"IP：{serverIn.add}");
+                Console.WriteLine("---------End---------");
             }
 
             // 显示服务器信息
-            PrintServerInfo(server1);
-            PrintServerInfo(server2);
-            PrintServerInfo(server3);
-            PrintServerInfo(server4);
+            foreach (var server in v2RayServers)
+            {
+                PrintServerInfo(server);
+            }
 
             // Test
             // 反序列化
-            var input = new StreamReader("../../../../Sample.yml");
+            var input = new StreamReader("../../../../Sample.yml", Encoding.UTF8);
             var deserializer = new Deserializer();
             var yamlConfig = deserializer.Deserialize<YamlConfig>(input);
-            
+
+            for (int j = 0; j < serverList.Length; j++)
+            {
+                yamlConfig.Proxies[j].Name = "服务器" + (j + 1);
+                yamlConfig.Proxies[j].Server = v2RayServers[j].add;
+                yamlConfig.Proxies[j].Port = Convert.ToInt16(v2RayServers[j].port);
+                yamlConfig.Proxies[j].Uuid = v2RayServers[j].id;
+                yamlConfig.Proxies[j].AlterId = v2RayServers[j].aid;
+                yamlConfig.Proxies[j].Cipher = v2RayServers[j].type;
+                yamlConfig.Proxies[j].Tls = v2RayServers[j].tls is "true" or "tls";
+                yamlConfig.Proxies[j].Udp = v2RayServers[j].net != "tcp";
+            }
+
             // 序列化
             var serializer = new Serializer();
-            await using (StreamWriter writer = new StreamWriter("../../../../Output.yml"))
-            {
-                await writer.WriteLineAsync(serializer.Serialize(yamlConfig));
-            }
+            await using StreamWriter writer = new StreamWriter("../../../../Output.yml", false, Encoding.UTF8);
+            await writer.WriteLineAsync(serializer.Serialize(yamlConfig));
 
             // Console.ReadKey();
         }
