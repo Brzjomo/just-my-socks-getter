@@ -106,6 +106,12 @@ namespace JustMySocksGetter
 
         private class AppConfig
         {
+            [YamlMember(Alias = "输入配置", ApplyNamingConventions = false)]
+            public string SamplePath { get; set; } = "./Sample.yml";
+
+            [YamlMember(Alias = "输出配置", ApplyNamingConventions = false)]
+            public string OutputPath { get; set; } = "./Output.yml";
+
             [YamlMember(Alias = "订阅链接", ApplyNamingConventions = false)]
             public string SubscribeLink { get; set; } = "https://";
 
@@ -121,47 +127,40 @@ namespace JustMySocksGetter
             Console.WriteLine("开始运行...");
 
             // 获取订阅链接
-            var autoClose = false;
-            var displayServerInfo = true;
+            var samplePath = "./Sample.yml";
+            var outputPath = "./Output.yml";
             var subscribeLink = "";
-            var appConfigPath = "../../../../Config.yml";
+            var displayServerInfo = true;
+            var autoClose = false;
+            var appConfigPath = "./Config.yml";
 
-            if (!File.Exists(appConfigPath))
-            {
-                appConfigPath = "./Config.yml";
-                if (File.Exists(appConfigPath))
-                {
-                    var appConfigInput = new StreamReader(appConfigPath, Encoding.UTF8);
-                    var appConfigDeserializer = new Deserializer();
-                    var appConfig = appConfigDeserializer.Deserialize<AppConfig>(appConfigInput);
-                    subscribeLink = appConfig.SubscribeLink;
-                    autoClose = appConfig.AutoClose;
-                    displayServerInfo = appConfig.DisplayServerInfo;
-                }
-                else
-                {
-                    // 创建一个空白设置文件
-                    var appConfig = new AppConfig()
-                    {
-                        SubscribeLink = "https://",
-                        DisplayServerInfo = true,
-                        AutoClose = false
-                    };
-                    var appConfigSerializer = new Serializer();
-                    await using StreamWriter appConfigWriter = new StreamWriter("./Config.yml", false, Encoding.UTF8);
-                    await appConfigWriter.WriteLineAsync(appConfigSerializer.Serialize(appConfig));
-
-                    return;
-                }
-            }
-            else
+            if (File.Exists(appConfigPath))
             {
                 var appConfigInput = new StreamReader(appConfigPath, Encoding.UTF8);
                 var appConfigDeserializer = new Deserializer();
                 var appConfig = appConfigDeserializer.Deserialize<AppConfig>(appConfigInput);
+                samplePath = appConfig.SamplePath;
+                outputPath = appConfig.OutputPath;
                 subscribeLink = appConfig.SubscribeLink;
                 autoClose = appConfig.AutoClose;
                 displayServerInfo = appConfig.DisplayServerInfo;
+            }
+            else
+            {
+                // 创建一个空白设置文件
+                var appConfig = new AppConfig()
+                {
+                    SamplePath = "./Sample.yml",
+                    OutputPath = "./Output.yml",
+                    SubscribeLink = "https://",
+                    DisplayServerInfo = true,
+                    AutoClose = false
+                };
+                var appConfigSerializer = new Serializer();
+                await using StreamWriter appConfigWriter = new StreamWriter("./Config.yml", false, Encoding.UTF8);
+                await appConfigWriter.WriteLineAsync(appConfigSerializer.Serialize(appConfig));
+
+                return;
             }
 
             // subscribeLink = "https://jmssub.net/members/getsub.php?service=448481&id=54d7e392-0c83-4989-8586-35471ecb7bf8&noss=1";
@@ -237,11 +236,14 @@ namespace JustMySocksGetter
                 }
             }
 
-            // 反序列化
-            var samplePath = "../../../../Sample.yml";
+            // 反序列化配置
             if (!File.Exists(samplePath))
             {
-                samplePath = "./Sample.yml";
+                Console.WriteLine("缺少Sample.yml");
+                Console.WriteLine("按任意键退出...");
+                Console.ReadKey();
+
+                return;
             }
 
             var input = new StreamReader(samplePath, Encoding.UTF8);
@@ -260,12 +262,6 @@ namespace JustMySocksGetter
             }
 
             // 序列化
-            var outputPath = "../../../../Output.yml";
-            if (!File.Exists("../../../../Sample.yml"))
-            {
-                outputPath = "./Output.yml";
-            }
-
             var serializer = new Serializer();
             await using StreamWriter writer = new StreamWriter(outputPath, false, Encoding.UTF8);
             await writer.WriteLineAsync(serializer.Serialize(yamlConfig));
