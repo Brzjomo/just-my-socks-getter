@@ -65,7 +65,7 @@ namespace JustMySocksGetter
             public string Type { get; set; } = "select";
 
             [YamlMember(Alias = "url", ApplyNamingConventions = false, DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
-            public string Url { get; set; }
+            public string? Url { get; set; }
 
             [YamlMember(Alias = "interval", ApplyNamingConventions = false, DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
             public int Interval { get; set; }
@@ -136,7 +136,9 @@ namespace JustMySocksGetter
 
             if (File.Exists(appConfigPath))
             {
-                var appConfigInput = new StreamReader(appConfigPath, Encoding.UTF8);
+                using var appConfigInputStream = new StreamReader(appConfigPath, Encoding.UTF8);
+                var appConfigInput = await appConfigInputStream.ReadToEndAsync();
+                appConfigInputStream.Close();
                 var appConfigDeserializer = new Deserializer();
                 var appConfig = appConfigDeserializer.Deserialize<AppConfig>(appConfigInput);
                 samplePath = appConfig.SamplePath;
@@ -162,8 +164,6 @@ namespace JustMySocksGetter
 
                 return;
             }
-
-            // subscribeLink = "https://jmssub.net/members/getsub.php?service=448481&id=54d7e392-0c83-4989-8586-35471ecb7bf8&noss=1";
 
             // http请求
             using var client = new HttpClient();
@@ -211,12 +211,12 @@ namespace JustMySocksGetter
             }
 
             // 反序列化
-            List<V2RayServer> v2RayServers = serverList.Select(t => JsonSerializer.Deserialize<V2RayServer>(t)).ToList();
+            var v2RayServers = serverList.Select(t => JsonSerializer.Deserialize<V2RayServer>(t)).ToList();
 
-            static void PrintServerInfo(V2RayServer serverIn)
+            static void PrintServerInfo(V2RayServer? serverIn)
             {
                 Console.WriteLine("---------Start---------");
-                Console.WriteLine($"名称：{serverIn.ps}");
+                Console.WriteLine($"名称：{serverIn!.ps}");
                 Console.WriteLine($"端口：{serverIn.port}");
                 Console.WriteLine($"用户ID：{serverIn.id}");
                 Console.WriteLine($"额外ID：{serverIn.aid}");
@@ -246,25 +246,28 @@ namespace JustMySocksGetter
                 return;
             }
 
-            var input = new StreamReader(samplePath, Encoding.UTF8);
-            var deserializer = new Deserializer();
-            var yamlConfig = deserializer.Deserialize<YamlConfig>(input);
+            using var inputStream = new StreamReader(samplePath, Encoding.UTF8);
+            var input = await inputStream.ReadToEndAsync();
+            inputStream.Close();
+            var inputDeserializer = new Deserializer();
+            var yamlConfig = inputDeserializer.Deserialize<YamlConfig>(input);
 
             for (int j = 0; j < serverList.Length; j++)
             {
                 yamlConfig.Proxies[j].Name = "服务器" + (j + 1);
-                yamlConfig.Proxies[j].Server = v2RayServers[j].add;
-                yamlConfig.Proxies[j].Port = Convert.ToInt16(v2RayServers[j].port);
-                yamlConfig.Proxies[j].Uuid = v2RayServers[j].id;
-                yamlConfig.Proxies[j].AlterId = v2RayServers[j].aid;
-                yamlConfig.Proxies[j].Tls = v2RayServers[j].tls is "true" or "tls";
-                yamlConfig.Proxies[j].Udp = v2RayServers[j].net != "tcp";
+                yamlConfig.Proxies[j].Server = v2RayServers[j]!.add;
+                yamlConfig.Proxies[j].Port = Convert.ToInt16(v2RayServers[j]!.port);
+                yamlConfig.Proxies[j].Uuid = v2RayServers[j]!.id;
+                yamlConfig.Proxies[j].AlterId = v2RayServers[j]!.aid;
+                yamlConfig.Proxies[j].Tls = v2RayServers[j]!.tls is "true" or "tls";
+                yamlConfig.Proxies[j].Udp = v2RayServers[j]!.net != "tcp";
             }
 
             // 序列化
+            await using var streamWriter = new StreamWriter(outputPath, false, Encoding.UTF8);
             var serializer = new Serializer();
-            await using StreamWriter writer = new StreamWriter(outputPath, false, Encoding.UTF8);
-            await writer.WriteLineAsync(serializer.Serialize(yamlConfig));
+            await streamWriter.WriteLineAsync(serializer.Serialize(yamlConfig));
+            streamWriter.Close();
 
             Console.WriteLine("运行完毕！");
 
