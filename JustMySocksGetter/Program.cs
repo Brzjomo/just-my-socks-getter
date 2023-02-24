@@ -104,14 +104,73 @@ namespace JustMySocksGetter
             public List<string> Rules { get; set; } = new List<string>();
         }
 
+        private class AppConfig
+        {
+            [YamlMember(Alias = "订阅链接", ApplyNamingConventions = false)]
+            public string SubscribeLink { get; set; } = "https://";
+
+            [YamlMember(Alias = "显示服务器信息", ApplyNamingConventions = false)]
+            public bool DisplayServerInfo { get; set; }
+
+            [YamlMember(Alias = "自动关闭", ApplyNamingConventions = false)]
+            public bool AutoClose { get; set; }
+        }
+
         public static async Task Main()
         {
             Console.WriteLine("开始运行...");
 
+            // 获取订阅链接
+            var autoClose = false;
+            var displayServerInfo = true;
+            var subscribeLink = "";
+            var appConfigPath = "../../../../Config.yml";
+
+            if (!File.Exists(appConfigPath))
+            {
+                appConfigPath = "./Config.yml";
+                if (File.Exists(appConfigPath))
+                {
+                    var appConfigInput = new StreamReader(appConfigPath, Encoding.UTF8);
+                    var appConfigDeserializer = new Deserializer();
+                    var appConfig = appConfigDeserializer.Deserialize<AppConfig>(appConfigInput);
+                    subscribeLink = appConfig.SubscribeLink;
+                    autoClose = appConfig.AutoClose;
+                    displayServerInfo = appConfig.DisplayServerInfo;
+                }
+                else
+                {
+                    // 创建一个空白设置文件
+                    var appConfig = new AppConfig()
+                    {
+                        SubscribeLink = "https://",
+                        DisplayServerInfo = true,
+                        AutoClose = false
+                    };
+                    var appConfigSerializer = new Serializer();
+                    await using StreamWriter appConfigWriter = new StreamWriter("./Config.yml", false, Encoding.UTF8);
+                    await appConfigWriter.WriteLineAsync(appConfigSerializer.Serialize(appConfig));
+
+                    return;
+                }
+            }
+            else
+            {
+                var appConfigInput = new StreamReader(appConfigPath, Encoding.UTF8);
+                var appConfigDeserializer = new Deserializer();
+                var appConfig = appConfigDeserializer.Deserialize<AppConfig>(appConfigInput);
+                subscribeLink = appConfig.SubscribeLink;
+                autoClose = appConfig.AutoClose;
+                displayServerInfo = appConfig.DisplayServerInfo;
+            }
+
+            // subscribeLink = "https://jmssub.net/members/getsub.php?service=448481&id=54d7e392-0c83-4989-8586-35471ecb7bf8&noss=1";
+
             // http请求
             using var client = new HttpClient();
-            client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36");
-            var serverContent = await client.GetStringAsync("https://jmssub.net/members/getsub.php?service=448481&id=54d7e392-0c83-4989-8586-35471ecb7bf8&noss=1");
+            client.DefaultRequestHeaders.Add("User-Agent",
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36");
+            var serverContent = await client.GetStringAsync(subscribeLink);
 
             // base64解码函数
             static string Base64Decode(string dataIn)
@@ -170,14 +229,22 @@ namespace JustMySocksGetter
             }
 
             // 显示服务器信息
-            foreach (var server in v2RayServers)
+            if (displayServerInfo)
             {
-                PrintServerInfo(server);
+                foreach (var server in v2RayServers)
+                {
+                    PrintServerInfo(server);
+                }
             }
 
-            // Test
             // 反序列化
-            var input = new StreamReader("../../../../Sample.yml", Encoding.UTF8);
+            var samplePath = "../../../../Sample.yml";
+            if (!File.Exists(samplePath))
+            {
+                samplePath = "./Sample.yml";
+            }
+
+            var input = new StreamReader(samplePath, Encoding.UTF8);
             var deserializer = new Deserializer();
             var yamlConfig = deserializer.Deserialize<YamlConfig>(input);
 
@@ -188,17 +255,28 @@ namespace JustMySocksGetter
                 yamlConfig.Proxies[j].Port = Convert.ToInt16(v2RayServers[j].port);
                 yamlConfig.Proxies[j].Uuid = v2RayServers[j].id;
                 yamlConfig.Proxies[j].AlterId = v2RayServers[j].aid;
-                yamlConfig.Proxies[j].Cipher = v2RayServers[j].type;
                 yamlConfig.Proxies[j].Tls = v2RayServers[j].tls is "true" or "tls";
                 yamlConfig.Proxies[j].Udp = v2RayServers[j].net != "tcp";
             }
 
             // 序列化
+            var outputPath = "../../../../Output.yml";
+            if (!File.Exists("../../../../Sample.yml"))
+            {
+                outputPath = "./Output.yml";
+            }
+
             var serializer = new Serializer();
-            await using StreamWriter writer = new StreamWriter("../../../../Output.yml", false, Encoding.UTF8);
+            await using StreamWriter writer = new StreamWriter(outputPath, false, Encoding.UTF8);
             await writer.WriteLineAsync(serializer.Serialize(yamlConfig));
 
-            // Console.ReadKey();
+            Console.WriteLine("运行完毕！");
+
+            if (!autoClose)
+            {
+                Console.WriteLine("按任意键退出...");
+                Console.ReadKey();
+            }
         }
     }
 }
