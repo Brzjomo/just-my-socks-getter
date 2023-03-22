@@ -165,11 +165,97 @@ namespace JustMySocksGetter
                 return;
             }
 
-            // http请求
-            using var client = new HttpClient();
-            client.DefaultRequestHeaders.Add("User-Agent",
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36");
-            var serverContent = await client.GetStringAsync(subscribeLink);
+            try
+            {
+                // http请求
+                using var client = new HttpClient();
+                client.DefaultRequestHeaders.Add("User-Agent",
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36");
+                var serverContent = await client.GetStringAsync(subscribeLink);
+                
+                // 解码并拼接为字符串
+                serverContent = Base64Decode(serverContent);
+                var serverContentText = string.Concat(serverContent);
+
+                // 分割服务器列表文本
+                string[] serverList = serverContentText.Split("vmess://");
+
+                // 删除空首行
+                if (serverList[0] == "")
+                {
+                    List<string> list = serverList.ToList();
+                    list.RemoveAt(0);
+                    serverList = list.ToArray();
+                }
+
+                // 解码服务器信息
+                for (int i = 0; i < serverList.Length; i++)
+                {
+                    serverList[i] = Base64Decode(serverList[i]);
+                }
+                
+                // 反序列化
+                var v2RayServers = serverList.Select(t => JsonSerializer.Deserialize<V2RayServer>(t)).ToList();
+                
+                // 显示服务器信息
+                if (displayServerInfo)
+                {
+                    foreach (var server in v2RayServers)
+                    {
+                        PrintServerInfo(server);
+                    }
+                }
+                
+                // 反序列化配置
+                if (!File.Exists(samplePath))
+                {
+                    Console.WriteLine("缺少Sample.yml");
+                    Console.WriteLine("按任意键退出...");
+                    Console.ReadKey();
+
+                    return;
+                }
+
+                using var inputStream = new StreamReader(samplePath, Encoding.UTF8);
+                var input = await inputStream.ReadToEndAsync();
+                inputStream.Close();
+                var inputDeserializer = new Deserializer();
+                var yamlConfig = inputDeserializer.Deserialize<YamlConfig>(input);
+
+                for (int j = 0; j < serverList.Length; j++)
+                {
+                    yamlConfig.Proxies[j].Name = "服务器" + (j + 1);
+                    yamlConfig.Proxies[j].Server = v2RayServers[j]!.add;
+                    yamlConfig.Proxies[j].Port = Convert.ToInt16(v2RayServers[j]!.port);
+                    yamlConfig.Proxies[j].Uuid = v2RayServers[j]!.id;
+                    yamlConfig.Proxies[j].AlterId = v2RayServers[j]!.aid;
+                    yamlConfig.Proxies[j].Tls = v2RayServers[j]!.tls is "true" or "tls";
+                    yamlConfig.Proxies[j].Udp = v2RayServers[j]!.net != "tcp";
+                }
+                
+                // 序列化
+                await using var streamWriter = new StreamWriter(outputPath, false, Encoding.UTF8);
+                var serializer = new Serializer();
+                await streamWriter.WriteLineAsync(serializer.Serialize(yamlConfig));
+                streamWriter.Close();
+
+                Console.WriteLine("运行完毕！");
+
+                if (!autoClose)
+                {
+                    Console.WriteLine("按任意键退出...");
+                    Console.ReadKey();
+                }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("网络错误！");
+                Console.WriteLine("---------Start---------");
+                Console.WriteLine(e);
+                Console.WriteLine("---------End---------");
+                Console.WriteLine("按任意键退出...");
+                Console.ReadKey();
+            }
 
             // base64解码函数
             static string Base64Decode(string dataIn)
@@ -189,30 +275,7 @@ namespace JustMySocksGetter
                 return Encoding.UTF8.GetString(data);
             }
 
-            // 解码并拼接为字符串
-            serverContent = Base64Decode(serverContent);
-            var serverContentText = string.Concat(serverContent);
-
-            // 分割服务器列表文本
-            string[] serverList = serverContentText.Split("vmess://");
-
-            // 删除空首行
-            if (serverList[0] == "")
-            {
-                List<string> list = serverList.ToList();
-                list.RemoveAt(0);
-                serverList = list.ToArray();
-            }
-
-            // 解码服务器信息
-            for (int i = 0; i < serverList.Length; i++)
-            {
-                serverList[i] = Base64Decode(serverList[i]);
-            }
-
-            // 反序列化
-            var v2RayServers = serverList.Select(t => JsonSerializer.Deserialize<V2RayServer>(t)).ToList();
-
+            // 打印服务器信息
             static void PrintServerInfo(V2RayServer? serverIn)
             {
                 Console.WriteLine("---------Start---------");
@@ -225,56 +288,6 @@ namespace JustMySocksGetter
                 Console.WriteLine($"TLS：{serverIn.tls}");
                 Console.WriteLine($"IP：{serverIn.add}");
                 Console.WriteLine("---------End---------");
-            }
-
-            // 显示服务器信息
-            if (displayServerInfo)
-            {
-                foreach (var server in v2RayServers)
-                {
-                    PrintServerInfo(server);
-                }
-            }
-
-            // 反序列化配置
-            if (!File.Exists(samplePath))
-            {
-                Console.WriteLine("缺少Sample.yml");
-                Console.WriteLine("按任意键退出...");
-                Console.ReadKey();
-
-                return;
-            }
-
-            using var inputStream = new StreamReader(samplePath, Encoding.UTF8);
-            var input = await inputStream.ReadToEndAsync();
-            inputStream.Close();
-            var inputDeserializer = new Deserializer();
-            var yamlConfig = inputDeserializer.Deserialize<YamlConfig>(input);
-
-            for (int j = 0; j < serverList.Length; j++)
-            {
-                yamlConfig.Proxies[j].Name = "服务器" + (j + 1);
-                yamlConfig.Proxies[j].Server = v2RayServers[j]!.add;
-                yamlConfig.Proxies[j].Port = Convert.ToInt16(v2RayServers[j]!.port);
-                yamlConfig.Proxies[j].Uuid = v2RayServers[j]!.id;
-                yamlConfig.Proxies[j].AlterId = v2RayServers[j]!.aid;
-                yamlConfig.Proxies[j].Tls = v2RayServers[j]!.tls is "true" or "tls";
-                yamlConfig.Proxies[j].Udp = v2RayServers[j]!.net != "tcp";
-            }
-
-            // 序列化
-            await using var streamWriter = new StreamWriter(outputPath, false, Encoding.UTF8);
-            var serializer = new Serializer();
-            await streamWriter.WriteLineAsync(serializer.Serialize(yamlConfig));
-            streamWriter.Close();
-
-            Console.WriteLine("运行完毕！");
-
-            if (!autoClose)
-            {
-                Console.WriteLine("按任意键退出...");
-                Console.ReadKey();
             }
         }
     }
