@@ -1,4 +1,5 @@
 ﻿using System.Collections;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using System.Text.Json;
@@ -120,6 +121,15 @@ namespace JustMySocksGetter
 
             [YamlMember(Alias = "自动关闭", ApplyNamingConventions = false)]
             public bool AutoClose { get; set; }
+
+            [YamlMember(Alias = "开机运行", ApplyNamingConventions = false)]
+            public bool AutoRun { get; set; }
+
+            [YamlMember(Alias = "程序路径", ApplyNamingConventions = false)]
+            public string AppLocation { get; set; } = "";
+
+            [YamlMember(Alias = "上次运行路径", ApplyNamingConventions = false)]
+            public string lastRunLocation { get; set; } = "";
         }
 
         public static async Task Main()
@@ -132,6 +142,9 @@ namespace JustMySocksGetter
             var subscribeLink = "";
             var displayServerInfo = true;
             var autoClose = false;
+            var autoRun = false;
+            var appLocation = "";
+            var lastRunLocation = "";
             var appConfigPath = "./Config.yml";
 
             if (File.Exists(appConfigPath))
@@ -145,6 +158,9 @@ namespace JustMySocksGetter
                 outputPath = appConfig.OutputPath;
                 subscribeLink = appConfig.SubscribeLink;
                 autoClose = appConfig.AutoClose;
+                autoRun = appConfig.AutoRun;
+                appLocation = appConfig.AppLocation;
+                lastRunLocation = appConfig.lastRunLocation;
                 displayServerInfo = appConfig.DisplayServerInfo;
             }
             else
@@ -156,7 +172,10 @@ namespace JustMySocksGetter
                     OutputPath = "./Output.yml",
                     SubscribeLink = "https://",
                     DisplayServerInfo = true,
-                    AutoClose = false
+                    AutoClose = false,
+                    AutoRun = false,
+                    AppLocation= "",
+                    lastRunLocation= ""
                 };
                 var appConfigSerializer = new Serializer();
                 await using StreamWriter appConfigWriter = new StreamWriter("./Config.yml", false, Encoding.UTF8);
@@ -164,6 +183,40 @@ namespace JustMySocksGetter
 
                 return;
             }
+
+            //开机启动
+            if (autoRun)
+            {
+                //更新程序路径
+                string appName = Process.GetCurrentProcess().MainModule.ModuleName;
+                string appPath = Process.GetCurrentProcess().MainModule.FileName;
+                appLocation = appPath;
+                //lastRunLocation= appLocation;
+                
+                //读取现有配置
+                using var appConfigInputStream = new StreamReader(appConfigPath, Encoding.UTF8);
+                var appConfigInput = await appConfigInputStream.ReadToEndAsync();
+                appConfigInputStream.Close();
+                var appConfigDeserializer = new Deserializer();
+                var appConfig = appConfigDeserializer.Deserialize<AppConfig>(appConfigInput);
+
+                //新建配置并更新现有配置
+                var appConfigNew = new AppConfig()
+                {
+                    SamplePath = appConfig.SamplePath,
+                    OutputPath = appConfig.OutputPath,
+                    SubscribeLink = appConfig.SubscribeLink,
+                    DisplayServerInfo = appConfig.DisplayServerInfo,
+                    AutoClose = appConfig.AutoClose,
+                    AutoRun = appConfig.AutoRun,
+                    AppLocation = appLocation,
+                    lastRunLocation = appConfig.AppLocation
+                };
+                var appConfigSerializer = new Serializer();
+                await using StreamWriter appConfigWriter = new StreamWriter(appConfigPath, false, Encoding.UTF8);
+                await appConfigWriter.WriteLineAsync(appConfigSerializer.Serialize(appConfigNew));
+            }
+            
 
             try
             {
