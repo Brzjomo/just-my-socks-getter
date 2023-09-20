@@ -142,8 +142,8 @@ namespace JustMySocksGetter
             Console.WriteLine("开始运行...\n");
 
             // 获取订阅链接
-            string samplePath = "./Sample.yml";
-            string outputPath = "./Output.yml";
+            string samplePath = "Sample.yml";
+            string outputPath = "Output.yml";
             string subscribeLink = "";
             string alterNativeSubscribeLink = "";
             bool displayServerInfo = true;
@@ -152,17 +152,26 @@ namespace JustMySocksGetter
             bool autoRun = false;
             string appLocation = "";
             string lastRunLocation = "";
-            string appConfigPath = "./Config.yml";
+            string appConfigPath = "Config.yml";
 
             if (File.Exists(appConfigPath))
             {
-                using var appConfigInputStream = new StreamReader(appConfigPath, Encoding.UTF8);
+                string programPath = "";
+                // 读取当前注册表路径
+                RegistryKey programPathRegistry = Registry.LocalMachine.OpenSubKey("SOFTWARE\\JustMySocksGetter", true);
+                if (programPathRegistry != null)
+                {
+                    programPath = programPathRegistry.GetValue("path") as string;
+                }
+
+                // 读取配置文件
+                using var appConfigInputStream = new StreamReader(programPath + appConfigPath, Encoding.UTF8);
                 var appConfigInput = await appConfigInputStream.ReadToEndAsync();
                 appConfigInputStream.Close();
                 var appConfigDeserializer = new Deserializer();
                 var appConfig = appConfigDeserializer.Deserialize<AppConfig>(appConfigInput);
-                samplePath = appConfig.SamplePath;
-                outputPath = appConfig.OutputPath;
+                samplePath = programPath + appConfig.SamplePath;
+                outputPath = programPath + appConfig.OutputPath;
                 subscribeLink = appConfig.SubscribeLink;
                 alterNativeSubscribeLink = appConfig.AlterNativeSubscribeLink;
                 autoClose = appConfig.AutoClose;
@@ -171,14 +180,22 @@ namespace JustMySocksGetter
                 appLocation = appConfig.AppLocation;
                 lastRunLocation = appConfig.LastRunLocation;
                 displayServerInfo = appConfig.DisplayServerInfo;
+
+                // 读取本地配置
+                if (programPath == "")
+                {
+                    samplePath = "./" + samplePath;
+                    outputPath = "./" + outputPath;
+                    appConfigPath = "./" + appConfigPath;
+                }
             }
             else
             {
                 // 创建一个空白设置文件
                 var appConfig = new AppConfig()
                 {
-                    SamplePath = "./Sample.yml",
-                    OutputPath = "./Output.yml",
+                    SamplePath = "Sample.yml",
+                    OutputPath = "Output.yml",
                     SubscribeLink = "https://",
                     AlterNativeSubscribeLink = "https://",
                     DisplayServerInfo = true,
@@ -234,6 +251,14 @@ namespace JustMySocksGetter
                     registry = Registry.LocalMachine.CreateSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run");
                 }
                 registry.SetValue(unhandledText[unhandledText.Length - 1], registryValue);
+
+                // 写入当前路径到注册表
+                RegistryKey programPathRegistry = Registry.LocalMachine.OpenSubKey("SOFTWARE\\JustMySocksGetter", true);
+                if (programPathRegistry == null || programPathRegistry != null && (programPathRegistry.GetValue("path") as string != appPath))
+                {
+                    programPathRegistry = Registry.LocalMachine.CreateSubKey("SOFTWARE\\JustMySocksGetter");
+                    programPathRegistry.SetValue("path", appPath);
+                }
 
                 //新建配置并更新现有配置
                 var appConfigNew = new AppConfig()
