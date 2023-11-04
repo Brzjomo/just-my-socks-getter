@@ -154,20 +154,25 @@ namespace JustMySocksGetter
             string lastRunLocation = "";
             string appConfigPath = "Config.yml";
 
+            bool muteAdmin = true;
+
             if (File.Exists(appConfigPath))
             {
-                string programPath = "";
-
-                // 读取当前注册表路径
-                RegistryKey programPathRegistry = Registry.LocalMachine.OpenSubKey("SOFTWARE\\JustMySocksGetter", true);
-                if (programPathRegistry != null)
+                if (muteAdmin == false)
                 {
-                    programPath = programPathRegistry.GetValue("path") as string;
-                }
+                    string programPath = "";
 
-                if (File.Exists(programPath + appConfigPath))
-                {
-                    appConfigPath = programPath + appConfigPath;
+                    // 读取当前注册表路径
+                    RegistryKey programPathRegistry = Registry.LocalMachine.OpenSubKey("SOFTWARE\\JustMySocksGetter", true);
+                    if (programPathRegistry != null)
+                    {
+                        programPath = programPathRegistry.GetValue("path") as string;
+                    }
+
+                    if (File.Exists(programPath + appConfigPath))
+                    {
+                        appConfigPath = programPath + appConfigPath;
+                    }
                 }
 
                 // 读取配置文件
@@ -242,20 +247,23 @@ namespace JustMySocksGetter
 
                 //请求管理员权限
 
-                //注册开机启动
-                RegistryKey registry = Registry.LocalMachine.OpenSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", true);
-                if (registry == null)
+                if (muteAdmin == false)
                 {
-                    registry = Registry.LocalMachine.CreateSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run");
-                }
-                registry.SetValue(unhandledText[unhandledText.Length - 1], registryValue);
+                    //注册开机启动
+                    RegistryKey registry = Registry.LocalMachine.OpenSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", true);
+                    if (registry == null)
+                    {
+                        registry = Registry.LocalMachine.CreateSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run");
+                    }
+                    registry.SetValue(unhandledText[unhandledText.Length - 1], registryValue);
 
-                // 写入当前路径到注册表
-                RegistryKey programPathRegistry = Registry.LocalMachine.OpenSubKey("SOFTWARE\\JustMySocksGetter", true);
-                if (programPathRegistry == null || programPathRegistry != null && (programPathRegistry.GetValue("path") as string != appPath))
-                {
-                    programPathRegistry = Registry.LocalMachine.CreateSubKey("SOFTWARE\\JustMySocksGetter");
-                    programPathRegistry.SetValue("path", appPath);
+                    // 写入当前路径到注册表
+                    RegistryKey programPathRegistry = Registry.LocalMachine.OpenSubKey("SOFTWARE\\JustMySocksGetter", true);
+                    if (programPathRegistry == null || programPathRegistry != null && (programPathRegistry.GetValue("path") as string != appPath))
+                    {
+                        programPathRegistry = Registry.LocalMachine.CreateSubKey("SOFTWARE\\JustMySocksGetter");
+                        programPathRegistry.SetValue("path", appPath);
+                    }
                 }
 
                 //新建配置并更新现有配置
@@ -304,13 +312,16 @@ namespace JustMySocksGetter
                     appLocation = appPath;
                 }
 
-                //删除注册表
-                RegistryKey registry = Registry.LocalMachine.OpenSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", true);
-                if (registry == null)
+                if (muteAdmin == false)
                 {
-                    registry = Registry.LocalMachine.CreateSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run");
+                    //删除注册表
+                    RegistryKey registry = Registry.LocalMachine.OpenSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", true);
+                    if (registry == null)
+                    {
+                        registry = Registry.LocalMachine.CreateSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run");
+                    }
+                    registry.DeleteValue(unhandledText[unhandledText.Length - 1], false);
                 }
-                registry.DeleteValue(unhandledText[unhandledText.Length - 1], false);
 
                 //新建配置并更新现有配置
                 var appConfigNew = new AppConfig()
