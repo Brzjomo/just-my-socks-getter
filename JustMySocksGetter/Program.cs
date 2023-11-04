@@ -157,6 +157,7 @@ namespace JustMySocksGetter
             if (File.Exists(appConfigPath))
             {
                 string programPath = "";
+
                 // 读取当前注册表路径
                 RegistryKey programPathRegistry = Registry.LocalMachine.OpenSubKey("SOFTWARE\\JustMySocksGetter", true);
                 if (programPathRegistry != null)
@@ -164,14 +165,19 @@ namespace JustMySocksGetter
                     programPath = programPathRegistry.GetValue("path") as string;
                 }
 
+                if (File.Exists(programPath + appConfigPath))
+                {
+                    appConfigPath = programPath + appConfigPath;
+                }
+
                 // 读取配置文件
-                using var appConfigInputStream = new StreamReader(programPath + appConfigPath, Encoding.UTF8);
+                using var appConfigInputStream = new StreamReader(appConfigPath, Encoding.UTF8);
                 var appConfigInput = await appConfigInputStream.ReadToEndAsync();
                 appConfigInputStream.Close();
                 var appConfigDeserializer = new Deserializer();
                 var appConfig = appConfigDeserializer.Deserialize<AppConfig>(appConfigInput);
-                samplePath = programPath + appConfig.SamplePath;
-                outputPath = programPath + appConfig.OutputPath;
+                samplePath = appConfig.SamplePath;
+                outputPath = appConfig.OutputPath;
                 subscribeLink = appConfig.SubscribeLink;
                 alterNativeSubscribeLink = appConfig.AlterNativeSubscribeLink;
                 autoClose = appConfig.AutoClose;
@@ -180,14 +186,6 @@ namespace JustMySocksGetter
                 appLocation = appConfig.AppLocation;
                 lastRunLocation = appConfig.LastRunLocation;
                 displayServerInfo = appConfig.DisplayServerInfo;
-
-                // 读取本地配置
-                if (programPath == "")
-                {
-                    samplePath = "./" + samplePath;
-                    outputPath = "./" + outputPath;
-                    appConfigPath = "./" + appConfigPath;
-                }
             }
             else
             {
